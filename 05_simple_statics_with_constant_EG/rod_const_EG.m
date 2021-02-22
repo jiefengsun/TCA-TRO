@@ -154,7 +154,7 @@ function rod_const_EG()
         grid on;
         % view(0,0)
         daspect([1 1 1]);
-        set(gcf, 'Units', 'Normalized', 'OuterPosition', [.45,0, .55, 1]);
+        set(gcf, 'Units', 'Normalized', 'OuterPosition', [.2,0.2, .25, .5]);
         drawnow;
     end
     

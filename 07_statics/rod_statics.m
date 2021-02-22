@@ -11,7 +11,7 @@ function rod_statics(mw, T_max)
     Fe_range = linspace(0, mg, floor(mg/0.05));
     
     % Geometry property
-    [l_t, l_star, r_star, alpha_star,~,~, N, alpha_min] = TCA_geo(mw);
+    [l_t, l_star, r_star, alpha_star, ~, N, alpha_min] = TCA_geo(mw);
     
     % Use 10 coils to accelerate the simulation.
     N_sim = 10; N_per_coil = 20; 
@@ -61,13 +61,13 @@ function rod_statics(mw, T_max)
         [EI, EA, GJ, GA, D_theta_bar_h] = TCA_moduli_creeped(T(i),  mw);% V_f = 0.4
         K =[EI, EI, GJ, GA, GA, EA]';
         % detect contact
-        
+       
         if(alpha < alpha_min)
-             D_theta_bar_h = D_theta_bar_h +  20*exp(50*(alpha-alpha_min)); 
+             D_theta_bar_h = D_theta_bar_h +  20*exp(50*(alpha_min-alpha)); 
              fprintf('Reach the minimum length'); 
         end
     
-        xi_0 = @(s)  [    0;
+        xi_0 =  [    0;
                           cos(alpha_star)^2/r_star;
                           sin(2*alpha_star)/(2*r_star)+ D_theta_bar_h ; 0;0;1];
         solinit = bvpinit(sol,[0 l_t]);
@@ -82,13 +82,15 @@ function rod_statics(mw, T_max)
         clf;
     end
     x = -N_scale*(l-l(1));
-    cd 'C:\MATLAB\TCA_TRO\06_statics'
-    writematrix([T, x], Name);
+    
+   % writematrix([T, x], Name);
     plot(T,  x); 
+     xlabel('Temperature $T$  ($^o$C)','interpreter','latex');
+    ylabel('Displacement $x$  (mm)','interpreter','latex');
     
-    
+        
     function y = init(s)
-    
+        % initial shape
         y = [   r_star*cos((s*cos(alpha_star))/r_star)
                 r_star*sin((s*cos(alpha_star))/r_star)
                 s*sin(alpha_star)
@@ -98,30 +100,25 @@ function rod_statics(mw, T_max)
     end
     
     function res = bc1(ya,yb)
-         
-        res = [ ya(1:7) - [p0; h0];
-                Adg(yb(1:7))*yb(8:13) - [Me; Fe]];%
+         % boundary value
+        res = [ ya(1:7) - [p0; h0]             
+        Adg(yb(1:7))* yb(8:13) - [Me; Fe]];
     end
         
 
     function ys = static_ODE(s,y)
-        % this is still required if the initial state is preloaded. 
-        % This is another formulation using m and n as
-        % varilables 
-        
+        % ODE     
         h = y(4:7);
         R = h2R(h);
-        Wi = y(8:13); % Wi  = [m,n] First component is the angular
-        xi = K.^-1.*Wi + xi_0(s); 
+        W = y(8:13); % W  = [m,n] First rotate 
+        xi = K.^-1.*W + xi_0; 
         u = xi(1:3); 
         v = xi(4:6);
         
         ps = R*v;
         hs = h_diff(u, h);
-        Wis = ad(xi)'*Wi; % ignore the distribued force
-        ys = [ps; hs; Wis];
-    %    MN = Adg(y(1:7))'*[Mext; Fext]; 
-        
+        Ws = ad(xi)'*W; % ignore the distribued force
+        ys = [ps; hs; Ws];        
     end
 
     
@@ -146,8 +143,9 @@ function rod_statics(mw, T_max)
                     u(3),  u(2), -u(1),   0  ] * h/2;
     end
 
-    %Function Definitions
+  
     function visualize(y)
+        % visualization
         plot3(y(1,:),y(2,:),y(3,:)); hold on
         plot3(y(1,end),y(2,end),y(3,end), 'ro', 'MarkerSize',10)
         title('TCA Dynamics');
@@ -158,18 +156,18 @@ function rod_statics(mw, T_max)
         grid on;
         % view(0,0)
         daspect([1 1 1]);
-        set(gcf, 'Units', 'Normalized', 'OuterPosition', [.45,0, .55, 1]);
+        set(gcf, 'Units', 'Normalized', 'OuterPosition', [.2,0.2, .25, .5]);
         drawnow;
     end
     
     function Adg = Adg(ph)
+        % Adjoint representation of Lie group
+        % used to transfer the 
         % ph is a vector ph = [p; h]; 
         p = ph(1:3); 
         h = ph(4:7);
         R = h2R(h);        
-        Adg = [R, zeros(3,3); skew(p)* R, R];
-        
+        Adg = [R, zeros(3,3); skew(p)* R, R];          
     end
-  
 
 end
