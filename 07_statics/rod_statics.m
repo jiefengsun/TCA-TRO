@@ -1,31 +1,17 @@
-function rod_statics(mw)
+function rod_statics(mw, T_max)
+    % input: mw the hanging weight, T_max is the max temperature; 
+    % 
+    % The final plot shows the displacement x with respect to the
+    % temperature. 
+    % 
 
-    % This is the TCA static, 
-    % the external force is prescribed as an boundary
-    % condition. The force is increased step by step. 
-    % using a bvp4c to solve the BVP problem
-    % 10/05/2020 copied from function TCA_pass_stat_4c.m
-    % borrow something from TCA_act_stat.m 
-    % change all alpha_c to alpha
-    % 10/6/2020 considering change of the coil radius
-    % 10/7/2020 simulation works. Match results. 
-    % 10/28/2020 
-    % 12/7 modified for hanging weight simulation
-    % 12/8 include the fiber actuation model
-    % 12/10 modify to make a general code for different weights. 
-    % 12/14 roll back to the old constitutive law. 
-    % 12/18/2020 revised to incorporate another type of TCA
-    % 1/13/2021 modify the model to solve the problem using Lie group
-    % formulation
-    
-    
     % Inputs
-    T = (25:5:160)'; 
+    T = (25:5:T_max)'; 
     mg = mw/1000*9.8; % mw is the weight in grams
-    F = [0:0.005:mg, mg];
+    Fe_range = linspace(0, mg, floor(mg/0.05));
     
     % Geometry property
-    [l_t, l_star, r_star, alpha_star, theta_bar_star, r_t, N, alpha_min] = TCA_geo(mw);
+    [l_t, l_star, r_star, alpha_star,~,~, N, alpha_min] = TCA_geo(mw);
     
     % Use 10 coils to accelerate the simulation.
     N_sim = 10; N_per_coil = 20; 
@@ -35,25 +21,20 @@ function rod_statics(mw)
     
     % Material property
     [EI, EA, GJ, GA, ~] = TCA_moduli_creeped(25, mw);% 
-    alpha_star = - alpha_star; 
     K = [EI, EI, GJ, GA, GA, EA]'; 
     
     % Reference twists
-    v_0 = [0; 0; 1];   
-    u_0 = @(s)  [    (sin(theta_bar_star*s)*cos(alpha_star)^2)/r_star
-                  (cos(theta_bar_star*s)*cos(alpha_star)^2)/r_star
-                  sin(2*alpha_star)/(2*r_star) ];
-     xi_0 = @(s) [u_0(s);  v_0]; 
+    xi_0 = [0; cos(alpha_star)^2/r_star; sin(2*alpha_star)/(2*r_star);  0; 0; 1]; 
     %Boundary Conditions
 
     p0 = [r_star; 0; 0];
     R0 = [ -1,             0,            0;
-            0,  -sin(alpha_star), cos(alpha_star);
-            0,  cos(alpha_star), sin(alpha_star)];
+            0,  sin(alpha_star), -cos(alpha_star);
+            0,  -cos(alpha_star), -sin(alpha_star)];
     h0 = rotm2quat(R0)';
-    Mext = [0; 0; 0]; % momentum at the tip, N*mm
-    Fext = [0; 0; 0]; % force at the tip 
-    MN = zeros(6,1);
+    Me = [0; 0; 0]; % momentum at the tip, N*mm
+    Fe = [0; 0; 0]; % force at the tip 
+   
     % Main Simulation %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     
     % Initialization
@@ -61,11 +42,11 @@ function rod_statics(mw)
     options = bvpset('Stats','off','RelTol',1e-5, 'NMax', 5000);
     N_step = length(T);
     l = ones(N_step, 1)*l_star;
-    N_step1 = length(F);
+    N_step1 = length(Fe_range);
     % iterate to the equilibrium with the after hanging the weigth. 
     for i  = 1:N_step1  % commont this part if we can load the data
        fprintf('preloading %d/%d \n', i, N_step1);
-       Fext(3)=  - F(i);       
+       Fe(3)=  - Fe_range(i);       
        sol = bvp5c(@static_ODE,@bc1,solinit,options);
        solinit = bvpinit(sol,[0 l_t]);
        visualize(sol.y);
@@ -77,20 +58,18 @@ function rod_statics(mw)
     for i = 1:N_step
         fprintf('%d/%d \n', i, N_step); 
          % update parameters 
-        [EI, EA, GJ, GA, D_theta_bar] = TCA_moduli_creeped(T(i),  mw);% V_f = 0.4
+        [EI, EA, GJ, GA, D_theta_bar_h] = TCA_moduli_creeped(T(i),  mw);% V_f = 0.4
         K =[EI, EI, GJ, GA, GA, EA]';
         % detect contact
         
-        if(alpha > alpha_min)
-            theta_bar = D_theta_bar;         
-        else
-             theta_bar = theta_bar +  20*exp(50*(alpha-alpha_min)); 
+        if(alpha < alpha_min)
+             D_theta_bar_h = D_theta_bar_h +  20*exp(50*(alpha-alpha_min)); 
              fprintf('Reach the minimum length'); 
         end
     
         xi_0 = @(s)  [    0;
                           cos(alpha_star)^2/r_star;
-                          sin(2*alpha_star)/(2*r_star)+ theta_bar ; 0;0;1];
+                          sin(2*alpha_star)/(2*r_star)+ D_theta_bar_h ; 0;0;1];
         solinit = bvpinit(sol,[0 l_t]);
         sol = bvp5c(@static_ODE,@bc1,solinit,options); % used constrained BC
         
@@ -114,14 +93,14 @@ function rod_statics(mw)
                 r_star*sin((s*cos(alpha_star))/r_star)
                 s*sin(alpha_star)
                 h0
-                Mext
-                Fext];
+                Me
+                Fe];
     end
     
     function res = bc1(ya,yb)
          
         res = [ ya(1:7) - [p0; h0];
-                Adg(yb(1:7))*yb(8:13) - [Mext; Fext]];%
+                Adg(yb(1:7))*yb(8:13) - [Me; Fe]];%
     end
         
 
