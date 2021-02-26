@@ -1,0 +1,1 @@
+Example: rod_statics_hanging_weight(30, 160), whihc will simulate a TCA with a weight of 30 g at the end heated up to 160 degree C. 
