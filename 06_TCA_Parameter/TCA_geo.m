@@ -28,7 +28,7 @@ function [l_t, l_star, r_star, alpha_star,r_t, N , alpha_min] = TCA_geo( mw)
 %  Fixed parameter
    
     l_star = l_t*sin(alpha_star); %    
-     alpha_min = 12/180*pi; % the pitch angle that some coils starts to contact   
+    alpha_min = 12/180*pi; % the pitch angle that some coils starts to contact   
 
     
 end

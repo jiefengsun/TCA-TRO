@@ -3,7 +3,6 @@ function rod_statics_hanging_weight(mw, T_max)
     % 
     % The final plot shows the displacement x with respect to the
     % temperature. 
-    % 
 
     % Inputs
     T = (25:5:T_max)'; 
@@ -85,7 +84,7 @@ function rod_statics_hanging_weight(mw, T_max)
     
    % writematrix([T, x], Name);
     plot(T,  x); 
-     xlabel('Temperature $T$  ($^o$C)','interpreter','latex');
+    xlabel('Temperature $T$  ($^o$C)','interpreter','latex');
     ylabel('Displacement $x$  (mm)','interpreter','latex');
     
         

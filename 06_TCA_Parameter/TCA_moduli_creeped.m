@@ -36,6 +36,6 @@ function [EI, EA, GJ, GA, D_theta_bar] = TCA_moduli_creeped(T, mw)
     EA = E*A_t;
         
    % untwisting parameter    
-    D_theta_bar =  -theta_bar_star *(1-1./Gamma);. 
+    D_theta_bar =  -theta_bar_star *(1-1./Gamma); 
    
 end
