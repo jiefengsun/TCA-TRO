@@ -1,26 +1,21 @@
-function rod_const_EG()
-    % This is the TCA static using constant E&G and ginores the conctat
-    
-    % The input
-    mw = 30; % the weight hanged
-    T = (25:5:160)'; % Temperature 
+function frame_demo_fd()
    
+    % To demonstrate the frame transformation, using a finite differce solver. 
+    
+
     % Geometry property     
     l_t =  175e-3; % Twistee fiber length
     r_start = 0.406e-3; % TCA diameter when it is made
     r_t = 0.22e-3; % twisted fiber radius
-    alpha_star = 22.42/180*pi; % pitch angle
+    alpha_star = 18/180*pi; % pitch angle
     n = l_t*cos(alpha_star)/(2*pi*r_start); % number of coils
-    l_star = l_t*sin(alpha_star); %  TCA initial length
     r_star =  0.406e-3; % mm
-  
+    h = 0; 
     % Use 10 coils to accelerate the simulation.
-    N_sim = 10; N_per_coil = 20; 
+    N_sim = 2; N_per_coil = 50; 
     Ns = N_per_coil*(N_sim); % Number of nodes   
     N_scale = n/N_sim; l_t = l_t/N_scale; 
-    l_star = l_star/N_scale; 
-    theta_bar_star = 4.71e+03; % rad/m
-    
+   
     % Material property
     E =  1.1980e+09; 
     G = 2.2177e+08;
@@ -39,53 +34,58 @@ function rod_const_EG()
     h0 = rotm2quat(R0)';
     Me = [0; 0; 0]; % momentum at the tip, N*mm
     Fe = [0; 0; 0]; % force at the tip 
-     
+    arrow_color = {'b' 'g' 'r' 'y' 'c'};    %color of the basis vectors
+    N_f = 1; 
+    currentFolder = pwd;
+    Ndir = [currentFolder,'\images'];
+    if ~exist(Ndir, 'dir')
+       mkdir(Ndir)
+    end
+    
     % Main Simulation %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     
     % Initialization
     solinit = bvpinit(linspace(0,l_t,Ns),@init);
     options = bvpset('Stats','off','RelTol',1e-5, 'NMax', 5000);
-    N_step = length(T); 
-    l = ones(N_step, 1)*l_star;
-    mg = mw/1000*9.8; % mw is the weight in grams
-    Fe_range = linspace(0,mg, 30); 
-    N_loading = length(Fe_range);
+
+ 
     % iterate to the equilibrium after hanging the weigth. 
-    for i  = 1:N_loading   
-       fprintf('Loading Step %d/%d \n', i, N_step); 
-       Fe(3)=  -Fe_range(i);       
-       sol = bvp5c(@static_ODE,@bc1,solinit,options);
-       solinit = bvpinit(sol,[0 l_t]);
-       visualize(sol.y);
-       clf;
+    sol = bvp5c(@static_ODE,@bc1,solinit,options);
+   
+    plot3(sol.y(1,:),sol.y(2,:),sol.y(3,:))
+    axis([-1.5*r_star 1.5*r_star -1.5*r_star 1.5*r_star -5*r_star r_star]);
+    for j= 1:4:Ns
+
+       hold on
+      frame =  plot_bf(h2R(sol.y(4:7, j)), sol.y(1:3,j));
+      delete(frame);
+
+    end
+    
+    
+    function h =  plot_bf(R_b, p) % plot body frame
+    
+    %
+    hold on
+   % axis([-r_star r_star -r_star r_star -5*r_star r_star]);
+    for i = 1:3     
+      h(i)  = quiver3( p(1), p(2), p(3), R_b(1,i),R_b(2,i),R_b(3,i), 0.0003,'linewidth',2, 'color', arrow_color{i}); 
+      h(i).MaxHeadSize = 30; 
+      h(i).MarkerSize =  25;       
+    end
+    grid on
+    set(gcf, 'Units', 'Normalized', 'OuterPosition', [0.1,0.1, .3, 0.5]);
+    set(gca, 'color', 'none')
+    xlabel('x')
+    ylabel('y')
+    zlabel('z')
+    daspect([1 1 1]);
+    drawnow 
+    Name = sprintf( '/fig%d.png', N_f);  print(gcf, '-dpng','-r200',[Ndir, Name])  
+    N_f = N_f+1; 
+   
     end
 
-    for i = 1:N_step
-        fprintf('Actuation Step %d/%d \n', i, N_step); 
-        % update parameters 
-        p_Gamma = [3.54e-06,-6.7e-05,1]; %polynomial
-        Gamma = polyval(p_Gamma, T(i)); % Gamma is related to the temperature. 
-        % untwisting parameter    
-        D_theta_bar_h = - theta_bar_star *(1-1./Gamma); 
-        
-        % update reference twist when heated
-        xi_0 = [0;   cos(alpha_star)^2/r_star;
-                sin(2*alpha_star)/(2*r_star)+ D_theta_bar_h;
-                0;0;1];
-        solinit = bvpinit(sol,[0 l_t]);
-        sol = bvp5c(@static_ODE,@bc1,solinit,options); % used constrained BC
-        
-        % The solution at the mesh points
-        ysol = sol.y; 
-        l(i) = norm(ysol(1:3, end) - ysol(1:3, 1));
-        visualize(ysol);
-        clf;
-    end
-    x = N_scale*(l(1)-l);
-    plot(T,  x); 
-    xlabel('Temperature $T$  ($^o$C)','interpreter','latex');
-    ylabel('Displacement $x$  (mm)','interpreter','latex');
-    
     
     function y = init(s)
         % initial shape
@@ -99,8 +99,8 @@ function rod_const_EG()
     
     function res = bc1(ya,yb)
          % boundary value
-        res = [ ya(1:7) - [p0; h0];             
-        yb(8:13) -  [Me;h2R(yb(4:7))'*Fe]];
+        res = [ ya(1:7) - [p0; h0]             
+      Adg(yb(1:7))* yb(8:13) -  [Me; Fe]];
     end
         
 
@@ -142,22 +142,7 @@ function rod_const_EG()
     end
 
   
-    function visualize(y)
-        % visualization
-        plot3(y(1,:),y(2,:),y(3,:)); hold on
-        plot3(y(1,end),y(2,end),y(3,end), 'ro', 'MarkerSize',10)
-        title('TCA Dynamics');
-        xlabel('x (m)');
-        ylabel('y (m)');
-        zlabel('z (m)');
-        axis([-r_star*5 r_star*5 -r_star*5 r_star*5 -1.5*l_star 0]);
-        grid on;
-        % view(0,0)
-        daspect([1 1 1]);
-        set(gcf, 'Units', 'Normalized', 'OuterPosition', [.2,0.2, .25, .5]);
-        drawnow;
-    end
-    
+
     function Adg = Adg(ph)
         % Adjoint representation of Lie group
         % used to transfer the 
