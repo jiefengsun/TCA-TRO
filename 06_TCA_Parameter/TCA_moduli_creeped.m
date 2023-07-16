@@ -4,16 +4,15 @@ function [EI, EA, GJ, GA, D_theta_bar] = TCA_moduli_creeped(T, mw)
 % Wrap it as a function and pass varialbes as arguments. - It seems
 % clearer. 
 % 10/28/2020 modified to in coporate the temperature change
-% 12/19/2020 add the strees dependence.
-% 1/2/2021 revided TCA_geo
+% 12/19/2020 add the strees dependence. 
  
     % import geometry
-    [~, ~, ~, alpha_star, r_t_star, ~, ~] = TCA_geo(mw); 
+    [~, ~, ~, alpha_star, ~, r_t_star, ~, ~] = TCA_geo(mw); 
 
     theta_bar_star = 2*pi*720/0.96; % rad/m
     
      % the polynomial for untwisting gamma     
-    p_Gamma = [3.542e-06,-6.70546321037470e-05,1.00169272047785];
+    p_Gamma = [3.54279134830752e-06,-6.70546321037470e-05,1.00169272047785];
     Gamma = polyval(p_Gamma, T); % Gamma is related to the temperature. 
     r_t = r_t_star*Gamma;% consider the thermal expansion of the radius of the fiber. 
        
@@ -36,6 +35,6 @@ function [EI, EA, GJ, GA, D_theta_bar] = TCA_moduli_creeped(T, mw)
     EA = E*A_t;
         
    % untwisting parameter    
-    D_theta_bar =  -theta_bar_star *(1-1./Gamma); 
+    D_theta_bar =  theta_bar_star *(1-1./Gamma); %use a factor a 1.6 for the self-coiled one. 
    
 end
